@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OPERATION: TELEGRAPH - 諜戰電報解密</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+    :root {
+        --bg-deep: #050806;
+        --bg-panel: #0a120d;
+        --bg-metal: #1f2421;
+        --terminal-green: #39ff14;
+        --terminal-green-dim: #1f800a;
+        --terminal-green-glow: rgba(57, 255, 20, 0.25);
+        --alert-red: #ff2a2a;
+        --alert-red-dim: #8b0000;
+        --alert-red-glow: rgba(255, 42, 42, 0.3);
+        --metal-light: #8a9a92;
+        --metal-dark: #121614;
+        --text-primary: #e0f2e6;
+        --text-secondary: #718f7d;
+        --text-tertiary: #3a5244;
+        
+        --font-mono: 'Share Tech Mono', monospace;
+        --font-typewriter: 'Special Elite', cursive;
+
+        --border-screen: 1px solid var(--terminal-green-dim);
+        --border-metal: 2px solid #3e4a42;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        font-family: var(--font-mono);
+        background-color: var(--bg-deep);
+        color: var(--terminal-green);
+        user-select: none;
+        overflow: hidden;
+    }
+
+    body::before {
+        content: " ";
+        display: block;
+        position: absolute;
+        top: 0; left: 0; bottom: 0; right: 0;
+        background: 
+            linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+            linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+        z-index: 999;
+        background-size: 100% 3px, 3px 100%;
+        pointer-events: none;
+        opacity: 0.8;
+    }
+
+    body::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-image: 
+            linear-gradient(var(--text-tertiary) 1px, transparent 1px),
+            linear-gradient(90deg, var(--text-tertiary) 1px, transparent 1px);
+        background-size: 40px 40px;
+        opacity: 0.1;
+        z-index: 0;
+        pointer-events: none;
+    }
+
+    .screen {
+        display: none;
+        flex-direction: column;
+        height: 100vh;
+        position: relative;
+        z-index: 10;
+    }
+    .screen.active { display: flex; }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .brand-mark {
+        width: 30px;
+        height: 30px;
+        border: 2px solid var(--terminal-green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        color: var(--terminal-green);
+        background: repeating-linear-gradient(
+            45deg,
+            #000,
+            #000 2px,
+            var(--terminal-green-dim) 2px,
+            var(--terminal-green-dim) 4px
+        );
+    }
+
+    .brand-name {
+        font-size: 18px;
+        letter-spacing: 0.15em;
+        color: var(--terminal-green);
+        text-shadow: 0 0 5px var(--terminal-green-glow);
+    }
+
+    /* 開發者資訊區塊 */
+    .developer-info {
+        margin-left: auto;
+        font-size: 12px;
+        color: var(--text-secondary);
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .developer-info a {
+        color: var(--terminal-green-dim);
+        text-decoration: none;
+        border: 1px solid var(--terminal-green-dim);
+        padding: 4px 8px;
+        transition: 0.2s;
+        background: #000;
+    }
+
+    .developer-info a:hover {
+        background: var(--terminal-green);
+        color: #000;
+        box-shadow: 0 0 10px var(--terminal-green-glow);
+    }
+
+    #setup-screen {
+        align-items: center;
+        justify-content: center;
+    }
+
+    .setup-topbar {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        padding: 20px 32px;
+        border-bottom: var(--border-screen);
+        background: rgba(5, 8, 6, 0.9);
+        display: flex;
+        align-items: center;
+    }
+
+    .setup-card {
+        width: 100%;
+        max-width: 500px;
+        padding: 40px;
+        background: var(--bg-panel);
+        border: var(--border-screen);
+        box-shadow: 0 0 20px var(--terminal-green-glow), inset 0 0 20px rgba(57, 255, 20, 0.05);
+        position: relative;
+    }
+
+    .setup-card::before, .setup-card::after,
+    #output-zone::before, #output-zone::after {
+        content: ''; position: absolute; width: 10px; height: 10px; border: 2px solid var(--terminal-green);
+    }
+    .setup-card::before { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+    .setup-card::after { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+
+    .setup-eyebrow {
+        font-size: 14px;
+        letter-spacing: 0.2em;
+        color: var(--alert-red);
+        margin-bottom: 10px;
+        display: inline-block;
+        border-bottom: 1px solid var(--alert-red);
+        padding-bottom: 4px;
+    }
+
+    .setup-title {
+        font-size: 32px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 0 0 10px;
+        text-shadow: 0 0 8px var(--terminal-green-glow);
+    }
+    .setup-title .blink { animation: blinker 1s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0; } }
+
+    .setup-subtitle {
+        font-size: 14px;
+        color: var(--text-secondary);
+        line-height: 1.6;
+        margin: 0 0 30px;
+    }
+
+    .setup-field label {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        color: var(--terminal-green);
+        margin-bottom: 8px;
+    }
+
+    .setup-input-row { display: flex; gap: 10px; }
+
+    #target-word-input {
+        flex: 1;
+        padding: 14px;
+        font-size: 20px;
+        font-family: var(--font-mono);
+        background-color: #000;
+        border: 1px solid var(--terminal-green-dim);
+        color: var(--terminal-green);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        box-shadow: inset 0 0 10px var(--terminal-green-glow);
+    }
+
+    #target-word-input:focus {
+        outline: none;
+        border-color: var(--terminal-green);
+        box-shadow: inset 0 0 15px var(--terminal-green-glow), 0 0 10px var(--terminal-green-glow);
+    }
+
+    .icon-btn {
+        background: #000;
+        color: var(--terminal-green);
+        border: 1px solid var(--terminal-green-dim);
+        padding: 0 15px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    .icon-btn:hover { background: var(--terminal-green-dim); color: #000; }
+
+    .setup-error {
+        color: var(--alert-red);
+        font-size: 12px;
+        margin-top: 8px;
+        min-height: 16px;
+        text-shadow: 0 0 5px var(--alert-red-glow);
+    }
+
+    .setup-hint {
+        font-size: 12px;
+        color: var(--text-tertiary);
+        margin-top: 5px;
+    }
+
+    #start-game-btn {
+        width: 100%;
+        padding: 16px;
+        margin-top: 20px;
+        font-size: 16px;
+        letter-spacing: 0.15em;
+        font-family: var(--font-mono);
+        background: var(--terminal-green);
+        color: #000;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
+        transition: 0.2s;
+    }
+    #start-game-btn:hover {
+        background: #fff;
+        box-shadow: 0 0 15px var(--terminal-green);
+    }
+
+    #game-screen { padding: 20px; gap: 20px; }
+
+    #game-topbar {
+        background: var(--bg-panel);
+        border: var(--border-screen);
+        padding: 12px 24px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    #back-to-setup-btn {
+        background: transparent;
+        color: var(--alert-red);
+        border: 1px solid var(--alert-red-dim);
+        padding: 8px 16px;
+        font-family: var(--font-mono);
+        font-size: 12px;
+        cursor: pointer;
+        letter-spacing: 0.1em;
+    }
+    #back-to-setup-btn:hover { background: var(--alert-red-dim); color: #fff; }
+
+    #game-container {
+        display: flex;
+        flex: 1;
+        gap: 20px;
+        min-height: 0;
+    }
+
+    #input-zone {
+        flex: 0 0 40%;
+        background: var(--bg-metal);
+        border: var(--border-metal);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        box-shadow: inset 0 0 50px rgba(0,0,0,0.8);
+    }
+
+    .zone-label {
+        position: absolute;
+        top: 15px; left: 15px;
+        font-size: 12px;
+        color: var(--metal-light);
+        letter-spacing: 0.1em;
+        background: #000;
+        padding: 4px 8px;
+        border: 1px solid #333;
+    }
+
+    .key-housing {
+        position: relative;
+        width: 240px; height: 240px;
+        background: #1a1e1c;
+        border-radius: 50%;
+        border: 4px solid #0a0d0b;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.8), inset 0 2px 5px rgba(255,255,255,0.1);
+        display: flex; justify-content: center; align-items: center;
+    }
+
+    .warning-stripes {
+        position: absolute;
+        inset: -12px;
+        border-radius: 50%;
+        background: repeating-linear-gradient(
+            45deg,
+            #ffd700,
+            #ffd700 10px,
+            #000 10px,
+            #000 20px
+        );
+        z-index: -1;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.9);
+    }
+
+    #telegraph-key {
+        width: 180px; height: 180px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 30% 30%, #ff4d4d, #cc0000 60%, #660000);
+        border: 2px solid #330000;
+        color: #fff;
+        font-size: 18px;
+        font-family: var(--font-mono);
+        font-weight: bold;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+        box-shadow: 0 12px 0 #4d0000, 0 15px 20px rgba(0,0,0,0.6), inset 0 5px 10px rgba(255,150,150,0.5);
+        transition: all 0.05s;
+        text-shadow: 0 2px 2px rgba(0,0,0,0.5);
+    }
+
+    #telegraph-key:active, #telegraph-key.active-state {
+        transform: translateY(10px);
+        box-shadow: 0 2px 0 #4d0000, 0 5px 10px rgba(0,0,0,0.6), inset 0 5px 10px rgba(0,0,0,0.5);
+        background: radial-gradient(circle at 30% 30%, #cc0000, #990000 60%, #4d0000);
+    }
+
+    #backspace-key {
+        margin-top: 40px;
+        padding: 10px 25px;
+        background: #000;
+        color: var(--metal-light);
+        border: 2px solid #333;
+        font-family: var(--font-mono);
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 0 #111;
+    }
+    #backspace-key:active, #backspace-key.active-state {
+        transform: translateY(4px); box-shadow: 0 0px 0 #111; border-color: var(--alert-red); color: var(--alert-red);
+    }
+
+    #output-zone {
+        flex: 1;
+        background: var(--bg-panel);
+        border: var(--border-screen);
+        padding: 30px;
+        display: flex; flex-direction: column;
+        position: relative;
+        box-shadow: inset 0 0 30px rgba(0,0,0,0.8);
+    }
+
+    .panel-heading {
+        font-size: 12px;
+        color: var(--text-secondary);
+        border-bottom: 1px dotted var(--text-tertiary);
+        margin: 0 0 15px; padding-bottom: 5px;
+        letter-spacing: 0.1em;
+    }
+
+    #signal-panel, #message-panel {
+        background: #000;
+        border: 1px solid #1a2b1f;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    #current-signal {
+        font-size: 50px;
+        letter-spacing: 15px;
+        color: var(--terminal-green);
+        height: 60px;
+        text-shadow: 0 0 10px var(--terminal-green-glow);
+    }
+
+    #message-panel { flex: 1; overflow-y: auto; }
+    #message-panel.is-error { border-color: var(--alert-red); box-shadow: inset 0 0 20px var(--alert-red-glow); }
+
+    #decoded-message {
+        font-family: var(--font-typewriter); 
+        font-size: 38px;
+        color: var(--text-primary);
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        text-shadow: 0 0 3px rgba(224, 242, 230, 0.4);
+    }
+
+    #submit-zone {
+        display: flex; align-items: center; gap: 15px;
+        background: #000; padding: 15px; border: 1px solid #1a2b1f;
+    }
+
+    #submit-btn {
+        padding: 12px 30px;
+        background: var(--terminal-green);
+        color: #000; font-weight: bold; font-family: var(--font-mono);
+        font-size: 16px; border: none; cursor: pointer; letter-spacing: 0.1em;
+    }
+    #submit-btn:hover { background: #fff; box-shadow: 0 0 15px var(--terminal-green); }
+
+    #submit-feedback { font-size: 14px; letter-spacing: 0.05em; }
+    #submit-feedback.feedback-error { color: var(--alert-red); text-shadow: 0 0 5px var(--alert-red-glow); }
+
+    #success-overlay {
+        position: fixed; inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        display: none; align-items: center; justify-content: center;
+        z-index: 1000;
+    }
+
+    #success-card {
+        background: #e8e4d9; 
+        border: 2px solid #333;
+        padding: 40px 60px;
+        text-align: center;
+        max-width: 450px;
+        position: relative;
+        box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        transform: rotate(-2deg); 
+    }
+
+    .top-secret-stamp {
+        border: 4px solid var(--alert-red);
+        color: var(--alert-red);
+        font-size: 32px;
+        font-family: var(--font-mono);
+        font-weight: bold;
+        letter-spacing: 0.1em;
+        padding: 10px 20px;
+        display: inline-block;
+        margin-bottom: 20px;
+        transform: rotate(-5deg);
+        opacity: 0.8;
+        mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.3"/><rect width="100%" height="100%" fill="white" opacity="0.9"/></svg>');
+        -webkit-mask-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.3"/><rect width="100%" height="100%" fill="white" opacity="0.9"/></svg>');
+    }
+
+    #success-card h3 {
+        font-family: var(--font-mono); color: #111; font-size: 18px; margin: 0 0 10px;
+    }
+
+    #success-word {
+        font-family: var(--font-typewriter); font-size: 36px; font-weight: bold; color: #000; margin-bottom: 30px;
+        border-bottom: 2px dashed #666; padding-bottom: 10px; display: inline-block;
+    }
+
+    .success-actions { display: flex; gap: 15px; justify-content: center; }
+    
+    .success-actions button {
+        padding: 10px 25px; font-family: var(--font-mono); font-size: 14px; font-weight: bold; cursor: pointer;
+        border: 2px solid #111; background: transparent; color: #111; transition: 0.2s;
+    }
+    .success-actions button:hover { background: #111; color: #e8e4d9; }
+
+    /* 手機版隱藏開發者資訊避免破版 */
+    @media (max-width: 760px) {
+        .developer-info { display: none; }
+        #game-container { flex-direction: column; }
+        #input-zone { flex: 0 0 auto; padding: 30px 10px; }
+        .key-housing { width: 180px; height: 180px; }
+        #telegraph-key { width: 130px; height: 130px; }
+        .setup-card { margin: 20px; padding: 25px; }
+    }
+</style>
+</head>
+<body>
+
+<div id="setup-screen" class="screen active">
+    <div class="setup-topbar">
+        <div class="brand">
+            <div class="brand-mark">HQ</div>
+            <div class="brand-name">OPERATION: TELEGRAPH</div>
+        </div>
+        <div class="developer-info">
+            <span>[SYS_ADMIN]</span>
+            <a href="https://www.threads.com/@lycbert" target="_blank" rel="noopener noreferrer">THREADS</a>
+            <a href="https://www.youtube.com/@datoemusic" target="_blank" rel="noopener noreferrer">YOUTUBE</a>
+        </div>
+    </div>
+
+    <div class="setup-card">
+        <div class="setup-eyebrow">MISSION CONTROL / 指揮中心</div>
+        <h1 class="setup-title">設定機密代號<span class="blink">_</span></h1>
+        <p class="setup-subtitle">輸入目標單字以生成加密任務。前線特務需透過電報機準確敲擊摩斯密碼，方能破譯此情報。</p>
+
+        <div class="setup-field">
+            <label for="target-word-input">ENCRYPTION TARGET (目標密文)</label>
+            <div class="setup-input-row">
+                <input type="password" id="target-word-input" placeholder="例如：TOP SECRET" autocomplete="off">
+                <button id="toggle-visibility-btn" class="icon-btn" title="顯示/隱藏">👁</button>
+            </div>
+            <p class="setup-error" id="setup-error"></p>
+            <p class="setup-hint">* 支援英文字母 A–Z 與空格</p>
+        </div>
+
+        <button id="start-game-btn">TRANSMIT ORDERS (發布任務) >></button>
+    </div>
+</div>
+
+<div id="game-screen" class="screen">
+    <div id="game-topbar">
+        <div class="brand">
+            <div class="brand-mark">OP</div>
+            <div class="brand-name">FIELD AGENT UPLINK</div>
+        </div>
+        <div class="developer-info">
+            <span>[SYS_ADMIN]</span>
+            <a href="https://www.threads.com/@lycbert" target="_blank" rel="noopener noreferrer">THREADS</a>
+            <a href="https://www.youtube.com/@datoemusic" target="_blank" rel="noopener noreferrer">YOUTUBE</a>
+        </div>
+        <button id="back-to-setup-btn">ABORT MISSION (撤退)</button>
+    </div>
+
+    <div id="game-container">
+        <div id="input-zone">
+            <div class="warning-stripes"></div>
+            <span class="zone-label">TX-UPLINK (發報站)</span>
+            
+            <div class="key-housing">
+                <button id="telegraph-key">TRANSMIT</button>
+            </div>
+            
+            <button id="backspace-key">⌫ DELETE (退格)</button>
+        </div>
+
+        <div id="output-zone">
+            <div id="signal-panel">
+                <p class="panel-heading">LIVE INTERCEPT (即時攔截訊號)</p>
+                <div id="current-signal"></div>
+            </div>
+
+            <div id="message-panel">
+                <p class="panel-heading">DECRYPTED INTEL (破譯情報)</p>
+                <div id="decoded-message"></div>
+            </div>
+
+            <div id="submit-zone">
+                <button id="submit-btn">VERIFY INTEL (驗證情報)</button>
+                <div id="submit-feedback"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="success-overlay">
+    <div id="success-card">
+        <div class="top-secret-stamp">INTEL VERIFIED</div>
+        <h3>任務代號破解成功</h3>
+        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">發送之摩斯密碼與指揮中心目標完全吻合。</p>
+        <div id="success-word"></div>
+        <div class="success-actions">
+            <button id="success-newword-btn">NEW MISSION (新任務)</button>
+            <button id="success-close-btn">DISMISS (關閉)</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const morseDict = {
+        ".-": "A", "-...": "B", "-.-.": "C", "-..": "D", ".": "E",
+        "..-.": "F", "--.": "G", "....": "H", "..": "I", ".---": "J",
+        "-.-": "K", ".-..": "L", "--": "M", "-.": "N", "---": "O",
+        ".--.": "P", "--.-": "Q", ".-.": "R", "...": "S", "-": "T",
+        "..-": "U", "...-": "V", ".--": "W", "-..-": "X", "-.--": "Y", "--..": "Z"
+    };
+
+    let pressStartTime = 0;
+    let currentSignalSequence = "";
+    let letterTimeout;
+    let wordTimeout;
+    let targetWord = "";
+
+    const setupScreen = document.getElementById('setup-screen');
+    const gameScreen = document.getElementById('game-screen');
+    const inputTargetWord = document.getElementById('target-word-input');
+    const btnToggleVisibility = document.getElementById('toggle-visibility-btn');
+    const btnStartGame = document.getElementById('start-game-btn');
+    const setupError = document.getElementById('setup-error');
+    const btnBackToSetup = document.getElementById('back-to-setup-btn');
+    const btnKey = document.getElementById('telegraph-key');
+    const btnBackspace = document.getElementById('backspace-key');
+    const displaySignal = document.getElementById('current-signal');
+    const displayMessage = document.getElementById('decoded-message');
+    const messagePanel = document.getElementById('message-panel');
+    const btnSubmit = document.getElementById('submit-btn');
+    const submitFeedback = document.getElementById('submit-feedback');
+    const successOverlay = document.getElementById('success-overlay');
+    const successWord = document.getElementById('success-word');
+    const successCloseBtn = document.getElementById('success-close-btn');
+    const successNewWordBtn = document.getElementById('success-newword-btn');
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let oscillator = null;
+
+    function playBeep() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        oscillator = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        oscillator.type = 'sine'; 
+        oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        oscillator.connect(gain);
+        gain.connect(audioCtx.destination);
+        oscillator.start();
+    }
+
+    function stopBeep() {
+        if (oscillator) {
+            oscillator.stop();
+            oscillator.disconnect();
+        }
+    }
+
+    btnToggleVisibility.addEventListener('click', () => {
+        if (inputTargetWord.type === "password") {
+            inputTargetWord.type = "text";
+            btnToggleVisibility.innerText = "🙈";
+        } else {
+            inputTargetWord.type = "password";
+            btnToggleVisibility.innerText = "👁";
+        }
+    });
+
+    inputTargetWord.addEventListener('input', () => setupError.innerText = "");
+    inputTargetWord.addEventListener('keydown', (e) => { if (e.key === 'Enter') startGame(); });
+    btnStartGame.addEventListener('click', startGame);
+
+    function startGame() {
+        const word = inputTargetWord.value.trim().toUpperCase();
+        if (word === "") {
+            setupError.innerText = "⚠ 拒絕存取：請輸入任務密碼";
+            inputTargetWord.focus(); return;
+        }
+        if (!/^[A-Z ]+$/.test(word)) {
+            setupError.innerText = "⚠ 格式錯誤：僅支援英文字母 A–Z 與空格";
+            inputTargetWord.focus(); return;
+        }
+        
+        targetWord = word.replace(/\s+/g, ' ');
+        setupError.innerText = "";
+        resetGameState();
+        setupScreen.classList.remove('active');
+        gameScreen.classList.add('active');
+    }
+
+    function returnToSetup() {
+        gameScreen.classList.remove('active');
+        setupScreen.classList.add('active');
+        resetGameState();
+        successOverlay.style.display = "none";
+        inputTargetWord.type = "password";
+        btnToggleVisibility.innerText = "👁";
+        inputTargetWord.focus();
+    }
+
+    btnBackToSetup.addEventListener('click', returnToSetup);
+    successNewWordBtn.addEventListener('click', returnToSetup);
+
+    function resetGameState() {
+        currentSignalSequence = "";
+        displaySignal.innerText = "";
+        displayMessage.innerText = "";
+        submitFeedback.innerText = "";
+        submitFeedback.classList.remove('feedback-error');
+        messagePanel.classList.remove('is-error');
+        clearTimeout(letterTimeout);
+        clearTimeout(wordTimeout);
+    }
+
+    function handlePressDown(e) {
+        if (!gameScreen.classList.contains('active')) return;
+        if (e && e.type !== 'keydown') e.preventDefault();
+        btnKey.classList.add('active-state');
+        playBeep();
+        clearTimeout(letterTimeout);
+        clearTimeout(wordTimeout);
+        pressStartTime = Date.now();
+    }
+
+    function handlePressUp(e) {
+        if (!gameScreen.classList.contains('active')) return;
+        if (e && e.type !== 'keyup') e.preventDefault();
+        btnKey.classList.remove('active-state');
+        stopBeep();
+        if (pressStartTime === 0) return;
+        
+        const duration = Date.now() - pressStartTime;
+        pressStartTime = 0;
+        
+        if (duration < 200) currentSignalSequence += ".";
+        else currentSignalSequence += "-";
+        
+        clearSubmitFeedback();
+        displaySignal.innerText = currentSignalSequence;
+        letterTimeout = setTimeout(() => { decodeLetter(); }, 800);
+        wordTimeout = setTimeout(() => { displayMessage.innerText += " "; }, 2000);
+    }
+
+    function handleBackspace(e) {
+        if (!gameScreen.classList.contains('active')) return;
+        if (e && e.type !== 'keydown') e.preventDefault();
+        btnBackspace.classList.add('active-state');
+        setTimeout(() => btnBackspace.classList.remove('active-state'), 100);
+        clearTimeout(letterTimeout); clearTimeout(wordTimeout); clearSubmitFeedback();
+
+        if (currentSignalSequence.length > 0) {
+            currentSignalSequence = currentSignalSequence.slice(0, -1);
+            displaySignal.innerText = currentSignalSequence;
+            if (currentSignalSequence.length > 0) letterTimeout = setTimeout(() => { decodeLetter(); }, 800);
+        } else {
+            let currentText = displayMessage.innerText;
+            if (currentText.length > 0) displayMessage.innerText = currentText.slice(0, -1);
+        }
+        if (currentSignalSequence === "") wordTimeout = setTimeout(() => { displayMessage.innerText += " "; }, 2000);
+    }
+
+    function decodeLetter() {
+        if (currentSignalSequence === "") return;
+        const letter = morseDict[currentSignalSequence];
+        if (letter) displayMessage.innerText += letter;
+        else displayMessage.innerText += "?";
+        currentSignalSequence = "";
+        displaySignal.innerText = "";
+    }
+
+    function clearSubmitFeedback() {
+        submitFeedback.innerText = "";
+        submitFeedback.classList.remove('feedback-error');
+        messagePanel.classList.remove('is-error');
+    }
+
+    function submitAnswer() {
+        if (currentSignalSequence !== "") decodeLetter();
+        
+        const currentTyped = displayMessage.innerText.trim().toUpperCase().replace(/\s+/g, ' ');
+
+        if (currentTyped === "") {
+            submitFeedback.innerText = "[!] 錯誤：未偵測到情報輸入";
+            submitFeedback.classList.add('feedback-error');
+            messagePanel.classList.add('is-error');
+            return;
+        }
+
+        if (currentTyped === targetWord) {
+            clearSubmitFeedback();
+            successWord.innerText = targetWord;
+            successOverlay.style.display = "flex";
+        } else {
+            submitFeedback.innerText = "[!] 警告：情報比對失敗，請重新破譯";
+            submitFeedback.classList.add('feedback-error');
+            messagePanel.classList.add('is-error');
+        }
+    }
+
+    btnSubmit.addEventListener('click', submitAnswer);
+    successCloseBtn.addEventListener('click', () => successOverlay.style.display = "none");
+    successOverlay.addEventListener('click', (e) => { if (e.target === successOverlay) successOverlay.style.display = "none"; });
+
+    btnKey.addEventListener('mousedown', handlePressDown);
+    btnKey.addEventListener('mouseup', handlePressUp);
+    btnKey.addEventListener('touchstart', handlePressDown, {passive: false});
+    btnKey.addEventListener('touchend', handlePressUp, {passive: false});
+
+    btnBackspace.addEventListener('mousedown', handleBackspace);
+    btnBackspace.addEventListener('touchstart', handleBackspace, {passive: false});
+
+    document.addEventListener('keydown', (e) => {
+        if (!gameScreen.classList.contains('active')) return;
+        if (e.key === 'Backspace') handleBackspace(e);
+        if (e.key === ' ' || e.code === 'Space') { if (!e.repeat) handlePressDown(e); }
+        if (e.key === 'Enter') submitAnswer();
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (!gameScreen.classList.contains('active')) return;
+        if (e.key === ' ' || e.code === 'Space') handlePressUp(e);
+    });
+</script>
+</body>
+</html>
